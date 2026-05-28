@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancelamentos & Devoluções — Regras e Fluxos</title>
+<style>
+  :root {
+    --taiff: #185FA5; --taiff-bg: #E6F1FB; --taiff-text: #0C447C;
+    --njr:   #3B6D11; --njr-bg:   #EAF3DE; --njr-text:   #27500A;
+    --tnf:   #854F0B; --tnf-bg:   #FAEEDA; --tnf-text:   #633806;
+    --pending-bg: #FFF8E1; --pending-border: #F9A825; --pending-text: #E65100;
+    --gray-bg: #F7F7F5; --border: #E0E0DC;
+    --text: #1A1A1A; --text-muted: #666; --text-hint: #999;
+    --white: #fff; --radius: 12px; --radius-sm: 8px;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: #F4F3F0; color: var(--text); font-size: 14px; line-height: 1.5; }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .top-bar h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .top-bar-right { display: flex; align-items: center; gap: 10px; }
+  .last-sync { font-size: 12px; color: var(--text-hint); }
+  .btn-refresh { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--white); font-size: 13px; cursor: pointer; color: var(--text); transition: background .15s; }
+  .btn-refresh:hover { background: var(--gray-bg); }
+  .btn-refresh svg { width: 14px; height: 14px; }
+
+  .url-bar { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .url-bar label { font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+  .url-bar input { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: var(--font); color: var(--text); background: var(--gray-bg); }
+  .url-bar input:focus { outline: none; border-color: #999; background: var(--white); }
+  .url-bar button { padding: 6px 16px; background: #1A1A1A; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .url-bar button:hover { background: #333; }
+
+  .section-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+  .tab-btn { padding: 8px 18px; border: none; background: none; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; border-radius: 4px 4px 0 0; }
+  .tab-btn:hover { color: var(--text); background: var(--gray-bg); }
+  .tab-btn.active { color: var(--text); border-bottom-color: #1A1A1A; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* CARDS DOS CLIENTES */
+  .clients-grid { display: flex; flex-direction: column; gap: 12px; }
+  .client-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .client-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; user-select: none; transition: background .15s; }
+  .client-header:hover { background: var(--gray-bg); }
+  .client-header-left { display: flex; align-items: center; gap: 14px; }
+  .client-logo { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; letter-spacing: .5px; flex-shrink: 0; }
+  .logo-taiff { background: var(--taiff-bg); color: var(--taiff-text); }
+  .logo-njr   { background: var(--njr-bg);   color: var(--njr-text); }
+  .logo-tnf   { background: var(--tnf-bg);   color: var(--tnf-text); }
+  .client-title { font-size: 15px; font-weight: 600; }
+  .client-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .client-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; border: 1px solid; }
+  .badge-blue  { background: var(--taiff-bg); color: var(--taiff-text); border-color: #B5D4F4; }
+  .badge-green { background: var(--njr-bg);   color: var(--njr-text);   border-color: #C0DD97; }
+  .badge-amber { background: var(--tnf-bg);   color: var(--tnf-text);   border-color: #FAC775; }
+  .badge-gray  { background: #F1EFE8; color: #5F5E5A; border-color: #D3D1C7; }
+  .badge-warn  { background: var(--pending-bg); color: var(--pending-text); border-color: #FFE082; }
+  .chevron { transition: transform .2s; color: var(--text-hint); font-size: 18px; line-height: 1; }
+  .chevron.open { transform: rotate(180deg); }
+
+  .client-body { display: none; border-top: 1px solid var(--border); }
+  .client-body.open { display: block; }
+
+  .body-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 20px; background: var(--gray-bg); }
+  .body-tab { padding: 10px 16px; font-size: 12px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+  .body-tab:hover { color: var(--text); }
+  .body-tab.active { color: var(--text); border-bottom-color: #1A1A1A; background: var(--white); }
+
+  .body-panel { display: none; padding: 20px; }
+  .body-panel.active { display: block; }
+
+  /* TABELA VISÃO GERAL */
+  .overview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .overview-table th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); background: var(--gray-bg); border-bottom: 1px solid var(--border); }
+  .overview-table td { padding: 10px 12px; border-bottom: 1px solid #F0EFEb; vertical-align: top; line-height: 1.5; }
+  .overview-table tr:last-child td { border-bottom: none; }
+  .overview-table tr:hover td { background: #FAFAF8; }
+  .dim-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-hint); }
+  .subdim { color: var(--text-muted); font-size: 12px; }
+  .cell-pending { background: var(--pending-bg) !important; }
+  .pending-icon { color: var(--pending-text); font-size: 12px; }
+
+  /* FLUXO */
+  .flow-section { margin-bottom: 24px; }
+  .flow-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .flow-steps { display: flex; flex-direction: column; gap: 0; }
+  .flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #F5F5F2; }
+  .flow-step:last-child { border-bottom: none; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: #1A1A1A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-num.sub { background: var(--gray-bg); color: var(--text); border: 1px solid var(--border); font-size: 10px; }
+  .step-content { flex: 1; }
+  .step-desc { font-size: 13px; line-height: 1.55; }
+  .step-pending { background: var(--pending-bg); border: 1px solid #FFE082; border-radius: 6px; padding: 6px 10px; margin-top: 6px; font-size: 12px; color: var(--pending-text); }
+
+  /* PENDÊNCIAS */
+  .pending-list { display: flex; flex-direction: column; gap: 8px; }
+  .pending-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid #FFE082; background: var(--pending-bg); }
+  .pending-item.resolved { background: #F0FBF4; border-color: #A8D5B5; opacity: .7; }
+  .pending-num { font-size: 11px; font-weight: 700; color: var(--pending-text); min-width: 20px; }
+  .pending-num.resolved { color: #2E7D32; }
+  .pending-body { flex: 1; }
+  .pending-q { font-size: 13px; line-height: 1.5; margin-bottom: 4px; }
+  .pending-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pending-resp { font-size: 11px; color: var(--text-muted); }
+  .status-pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .status-open     { background: #FEECEC; color: #B71C1C; }
+  .status-resolved { background: #E8F5E9; color: #1B5E20; }
+  .status-progress { background: #FFF3E0; color: #E65100; }
+
+  /* VISÃO GERAL comparativo */
+  .compare-wrap { overflow-x: auto; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+  .compare-table th { padding: 10px 14px; font-size: 12px; font-weight: 700; border-bottom: 2px solid var(--border); text-align: left; }
+  .compare-table th.taiff { color: var(--taiff-text); border-bottom-color: var(--taiff); }
+  .compare-table th.njr   { color: var(--njr-text);   border-bottom-color: var(--njr); }
+  .compare-table th.tnf   { color: var(--tnf-text);   border-bottom-color: var(--tnf); }
+  .compare-table td { padding: 10px 14px; border-bottom: 1px solid #F0EFEb; vertical-align: top; }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table .dim-row td { background: var(--gray-bg); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); padding: 6px 14px; }
+  .compare-table td.taiff-cell { background: #FAFCFF; }
+  .compare-table td.njr-cell   { background: #FAFFFA; }
+  .compare-table td.tnf-cell   { background: #FFFDF5; }
+
+  /* SUMÁRIO DE PENDÊNCIAS (seção global) */
+  .pend-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .pend-filter button { padding: 5px 14px; border: 1px solid var(--border); border-radius: 99px; font-size: 12px; background: var(--white); cursor: pointer; color: var(--text-muted); transition: all .15s; }
+  .pend-filter button.active, .pend-filter button:hover { background: #1A1A1A; color: #fff; border-color: #1A1A1A; }
+  .pend-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-hint); margin: 16px 0 8px; }
+
+  .loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+  .error-box { background: #FEECEC; border: 1px solid #EF9595; border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: #7F1D1D; margin: 12px 0; }
+
+  .info-box { background: #E6F1FB; border: 1px solid #B5D4F4; border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: #0C447C; margin-bottom: 16px; line-height: 1.6; }
+  .info-box strong { font-weight: 600; }
+
+  /* CARD DE EQUIPE */
+  .team-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; }
+  .team-card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-hint); margin-bottom: 12px; }
+  .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .team-member { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--gray-bg); border: 1px solid var(--border); }
+  .team-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .team-info { min-width: 0; }
+  .team-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-role { font-size: 11px; color: var(--text-muted); }
+  /* badge inline de responsável no fluxo */
+  .owner-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 99px; border: 1px solid; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+  .owner-cs      { background: #EAF3DE; color: #27500A; border-color: #C0DD97; }
+  .owner-fraude  { background: #FAEEDA; color: #633806; border-color: #FAC775; }
+  .owner-fiscal  { background: #E6F1FB; color: #0C447C; border-color: #B5D4F4; }
+  .owner-operacao{ background: #F1EFE8; color: #444441; border-color: #D3D1C7; }
+
+  @media (max-width: 600px) {
+    .page { padding: 16px 12px 60px; }
+    .top-bar h1 { font-size: 18px; }
+    .compare-table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-bar">
+    <h1>Cancelamentos &amp; Devoluções</h1>
+    <div class="top-bar-right">
+      <span class="last-sync" id="last-sync">—</span>
+      <button class="btn-refresh" onclick="loadAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+        Atualizar
+      </button>
+    </div>
+  </div>
+
+  <div class="url-bar" style="display:none">
+    <label>URL Google Sheets (CSV)</label>
+    <input id="sheets-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/SEU_ID/pub?output=csv&gid=0" />
+    <button onclick="applyUrl()">Conectar</button>
+  </div>
+
+  <div class="team-card" id="team-card" style="display:none">
+    <div class="team-card-title">Time responsável</div>
+    <div class="team-grid" id="team-grid"></div>
+  </div>
+
+  <div class="section-tabs">
+    <button class="tab-btn active" onclick="switchSection('visao-geral', this)">Visão comparativa</button>
+    <button class="tab-btn" onclick="switchSection('clientes', this)">Fluxos por cliente</button>
+  </div>
+
+  <!-- SEÇÃO 1: VISÃO COMPARATIVA -->
+  <div class="section active" id="section-visao-geral">
+    <div id="visao-container"><div class="loading">Carregando dados...</div></div>
+  </div>
+
+  <!-- SEÇÃO 2: FLUXOS POR CLIENTE -->
+  <div class="section" id="section-clientes">
+    <div class="clients-grid" id="clients-container">
+      <div class="loading">Carregando dados...</div>
+    </div>
+  </div>
+
+
+
+</div>
+
+<script>
+const CLIENTS = {
+  TAIFF: { label: 'TAIFF', cls: 'logo-taiff', badgeCls: 'badge-blue',
+    badges: ['Stack Antiga', 'AJD + SILT', 'Fullservice', 'Compra & Venda'] },
+  NJR:   { label: 'NJR',   cls: 'logo-njr',   badgeCls: 'badge-green',
+    badges: ['Stack Nova', 'OMS + WMS Inventa', 'Fullfilment Puro', 'Filial c/ cert.'] },
+  TNF:   { label: 'TNF',   cls: 'logo-tnf',   badgeCls: 'badge-amber',
+    badges: ['Stack Nova', 'OMS + WMS Inventa', 'Fullfilment Puro', 'Filial s/ cert.'] },
+};
+
+let DATA = { visao: [], fluxos: [], equipe: [] };
+let pendFilter = 'all';
+
+const SHEET_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTLBt0HMG5G8grQrIPv_NtOhyhH1w_P6tUhqRgK8XtZGyu_DQ89wxpvrg5OVJe51b3JfcB8vgJrKoRN/pub?output=csv&gid=';
+const GID = { visao: '526900532', fluxos: '2099591346', equipe: '586521663' };
+let sheetBaseUrl = SHEET_BASE;
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,'').toLowerCase().replace(/\s+/g,'_'));
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    vals.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (vals[i] || '').replace(/^"|"$/g,''));
+    return obj;
+  });
+}
+
+async function fetchSheet(gid) {
+  const url = SHEET_BASE + gid;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    return parseCSV(await res.text());
+  } catch(e) { return null; }
+}
+
+async function loadAll() {
+  document.getElementById('last-sync').textContent = 'Atualizando...';
+
+  const [visao, fluxos, equipe] = await Promise.all([
+    fetchSheet(GID.visao),
+    fetchSheet(GID.fluxos),
+    fetchSheet(GID.equipe),
+  ]);
+
+  if (visao)  DATA.visao  = visao;
+  if (fluxos) DATA.fluxos = fluxos;
+  if (equipe) DATA.equipe = equipe;
+
+  renderTeam();
+  renderVisao();
+  renderClients();
+
+  // Re-render panels of any card that's currently open
+  document.querySelectorAll('.client-body.open').forEach(body => {
+    const key = body.id.replace('body-', '');
+    populatePanels(key);
+  });
+
+  const now = new Date();
+  document.getElementById('last-sync').textContent =
+    'Atualizado ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+}
+
+function renderVisao() {
+  const container = document.getElementById('visao-container');
+  if (!DATA.visao.length) {
+    container.innerHTML = demoVisao(); return;
+  }
+
+  let dims = [...new Set(DATA.visao.map(r => r.dimensao))];
+  let html = '<div class="compare-wrap"><table class="compare-table">';
+  html += '<thead><tr><th style="width:160px">Dimensão / Sub-dimensão</th>';
+  html += '<th class="taiff">TAIFF</th><th class="njr">NJR</th><th class="tnf">TNF</th></tr></thead><tbody>';
+
+  dims.forEach(dim => {
+    html += `<tr class="dim-row"><td colspan="4">${dim}</td></tr>`;
+    DATA.visao.filter(r => r.dimensao === dim).forEach(r => {
+      const isPendT = r.taiff && r.taiff.includes('⚠');
+      const isPendN = r.njr   && r.njr.includes('⚠');
+      const isPendF = r.tnf   && r.tnf.includes('⚠');
+      html += `<tr>
+        <td><span class="subdim">${r.subdimensao||''}</span></td>
+        <td class="taiff-cell ${isPendT?'cell-pending':''}">${fmt(r.taiff)}</td>
+        <td class="njr-cell   ${isPendN?'cell-pending':''}">${fmt(r.njr)}</td>
+        <td class="tnf-cell   ${isPendF?'cell-pending':''}">${fmt(r.tnf)}</td>
+      </tr>`;
+    });
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+function fmt(val) {
+  if (!val) return '<span style="color:#ccc">—</span>';
+  const hasPend = val.includes('⚠');
+  let v = val.replace(/\n/g,'<br>');
+  if (hasPend) v = v.replace(/⚠/g, '<span class="pending-icon">⚠</span>');
+  return v;
+}
+
+const TEAM_COLORS = {
+  'cs':       { bg:'#EAF3DE', color:'#27500A', cls:'owner-cs' },
+  'fraude':   { bg:'#FAEEDA', color:'#633806', cls:'owner-fraude' },
+  'fiscal':   { bg:'#E6F1FB', color:'#0C447C', cls:'owner-fiscal' },
+  'operacao': { bg:'#F1EFE8', color:'#444441', cls:'owner-operacao' },
+  'operação': { bg:'#F1EFE8', color:'#444441', cls:'owner-operacao' },
+};
+
+function getTeamMember(role) {
+  const key = (role||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const found = DATA.equipe.find(m => {
+    const t = (m.time||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return t === key || t.includes(key) || key.includes(t);
+  });
+  if (!found && DATA.equipe.length === 0) {
+    const demo = { cs:'Camila Belarmino', fraude:'Hugo Oliveira', fiscal:'Rosana de Freitas', operacao:'Yoshi Takinami', 'operação':'Yoshi Takinami' };
+    return demo[key] ? { time: role, nome: demo[key] } : null;
+  }
+  return found || null;
+}
+
+function ownerBadge(role) {
+  const member = getTeamMember(role);
+  if (!member) return '';
+  const initials = member.nome.split(' ').slice(0,2).map(w=>w[0]).join('');
+  const colorKey = (role||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s.*/,'');
+  const c = TEAM_COLORS[colorKey] || TEAM_COLORS['operacao'];
+  return `<span class="owner-badge ${c.cls}" title="${member.nome}">${initials} ${member.nome.split(' ')[0]}</span>`;
+}
+
+function injectOwners(desc) {
+  const rules = [
+    { pattern: /\b(time de cs|cs\b|sac\b)/gi,      role: 'CS' },
+    { pattern: /\b(time de fraude|fraude\b)/gi,     role: 'Fraude' },
+    { pattern: /\b(fiscal\b|time fiscal)/gi,        role: 'Fiscal' },
+    { pattern: /\b(time operacional|operac[aã]o\b)/gi, role: 'Operação' },
+  ];
+  let result = desc;
+  const injected = new Set();
+  rules.forEach(({ pattern, role }) => {
+    if (pattern.test(result) && !injected.has(role)) {
+      injected.add(role);
+      result = result.replace(pattern, (match) => match + ownerBadge(role));
+    }
+  });
+  return result;
+}
+
+function renderTeam() {
+  const card = document.getElementById('team-card');
+  const grid = document.getElementById('team-grid');
+  const members = DATA.equipe.length ? DATA.equipe : [
+    {time:'CS',       nome:'Camila Belarmino'},
+    {time:'Fraude',   nome:'Hugo Oliveira'},
+    {time:'Operação', nome:'Yoshi Takinami'},
+    {time:'Fiscal',   nome:'Rosana de Freitas'},
+  ];
+  const roleOrder = ['CS','Fraude','Operação','Fiscal'];
+  const sorted = [...members].sort((a,b) => {
+    const ia = roleOrder.indexOf(a.time); const ib = roleOrder.indexOf(b.time);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+  grid.innerHTML = sorted.map(m => {
+    const colorKey = (m.time||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s.*/,'');
+    const c = TEAM_COLORS[colorKey] || TEAM_COLORS['operacao'];
+    const initials = (m.nome||'').split(' ').slice(0,2).map(w=>w[0]).join('');
+    const email = m.email ? `<div style="font-size:10px;color:var(--text-hint);margin-top:1px">${m.email}</div>` : '';
+    return `<div class="team-member">
+      <div class="team-avatar" style="background:${c.bg};color:${c.color}">${initials}</div>
+      <div class="team-info">
+        <div class="team-name">${m.nome||'—'}</div>
+        <div class="team-role">${m.time||'—'}</div>
+        ${email}
+      </div>
+    </div>`;
+  }).join('');
+  card.style.display = 'block';
+}
+
+function renderClients() {
+  const container = document.getElementById('clients-container');
+  let html = '';
+  Object.entries(CLIENTS).forEach(([key, cfg]) => {
+    const subtext = {
+      TAIFF: 'Stack Antiga · AJD + SILT · Fullservice',
+      NJR:   'Stack Nova · OMS Inventa · Fullfilment Puro',
+      TNF:   'Stack Nova · OMS Inventa · Fullfilment Puro',
+    }[key];
+
+    html += `<div class="client-card" id="card-${key}">
+      <div class="client-header" onclick="toggleCard('${key}')">
+        <div class="client-header-left">
+          <div class="client-logo ${cfg.cls}">${key}</div>
+          <div>
+            <div class="client-title">${cfg.label}</div>
+            <div class="client-subtitle">${subtext}</div>
+            <div class="client-badges">
+              ${cfg.badges.map(b => `<span class="badge ${cfg.badgeCls}">${b}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <span class="chevron" id="chev-${key}">&#8964;</span>
+      </div>
+      <div class="client-body" id="body-${key}">
+        <div class="body-tabs">
+          <span class="body-tab active" onclick="switchBodyTab('${key}','cancel',this)">Cancelamentos</span>
+          <span class="body-tab" onclick="switchBodyTab('${key}','devolucao',this)">Devoluções</span>
+          <span class="body-tab" onclick="switchBodyTab('${key}','geral',this)">Infra &amp; Config</span>
+        </div>
+        <div class="body-panel active" id="panel-${key}-cancel"></div>
+        <div class="body-panel" id="panel-${key}-devolucao"></div>
+        <div class="body-panel" id="panel-${key}-geral"></div>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderFluxo(cliente, tipo) {
+  const steps = DATA.fluxos.filter(r =>
+    r.cliente && r.cliente.toUpperCase() === cliente.toUpperCase() &&
+    r.tipo    && r.tipo.toLowerCase().includes(tipo.toLowerCase().substring(0,6))
+  );
+  if (!steps.length) return demoFluxo(cliente, tipo);
+
+  let html = '<div class="flow-steps">';
+  steps.forEach(s => {
+    const isPend = s.pendente && s.pendente.toLowerCase() === 'true';
+    html += `<div class="flow-step">
+      <div class="step-num ${s.etapa && s.etapa.includes('.')?'sub':''}">${s.etapa||'•'}</div>
+      <div class="step-content">
+        <div class="step-desc">${injectOwners((s.descricao||'').replace(/\n/g,'<br>'))}</div>
+        ${isPend ? `<div class="step-pending">⚠ Ponto a confirmar</div>` : ''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderInfoGeral(cliente) {
+  const rows = DATA.visao.filter(r =>
+    r.dimensao && r.dimensao.toUpperCase() === 'INFRA'
+  );
+  if (!rows.length) return demoInfoGeral(cliente);
+  const col = cliente.toLowerCase();
+  let html = '<table class="overview-table" style="width:100%">';
+  html += '<thead><tr><th>Configuração</th><th>Valor</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const val = r[col] || '—';
+    html += `<tr><td class="subdim">${r.subdimensao||''}</td><td>${fmt(val)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderPendencias() {
+  const container = document.getElementById('pend-container');
+  let filtered = DATA.pendencias.length ? DATA.pendencias : demoData().pendencias;
+  if (pendFilter !== 'all') {
+    filtered = filtered.filter(p => p.cliente && p.cliente.toUpperCase() === pendFilter);
+  }
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="loading">Nenhuma pendência encontrada.</div>'; return;
+  }
+
+  const byClient = {};
+  filtered.forEach(p => {
+    const k = (p.cliente||'GERAL').toUpperCase();
+    if (!byClient[k]) byClient[k] = [];
+    byClient[k].push(p);
+  });
+
+  let html = '';
+  Object.entries(byClient).forEach(([cli, items]) => {
+    const cfg = CLIENTS[cli] || {};
+    html += `<div class="pend-section-title">${cli} <span style="font-weight:400;color:#aaa">· ${items.length} item(s)</span></div>`;
+    html += '<div class="pending-list">';
+    items.forEach((p, i) => {
+      const st = (p.status||'aberto').toLowerCase();
+      const isRes = st === 'resolvido' || st === 'resolved';
+      html += `<div class="pending-item ${isRes?'resolved':''}">
+        <div class="pending-num ${isRes?'resolved':''}">⚠</div>
+        <div class="pending-body">
+          <div class="pending-q">${p.pergunta||p.descricao||'—'}</div>
+          <div class="pending-meta">
+            <span class="pending-resp">Responsável: <strong>${p.responsavel||'—'}</strong></span>
+            <span class="status-pill ${st==='aberto'?'status-open':st==='em andamento'?'status-progress':'status-resolved'}">${p.status||'Aberto'}</span>
+            ${p.data_resposta ? `<span style="font-size:11px;color:#aaa">${p.data_resposta}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function populatePanels(key) {
+  const cancel   = document.getElementById(`panel-${key}-cancel`);
+  const devolucao = document.getElementById(`panel-${key}-devolucao`);
+  const geral    = document.getElementById(`panel-${key}-geral`);
+  if (cancel)    cancel.innerHTML    = renderFluxo(key, 'cancelamento');
+  if (devolucao) devolucao.innerHTML = renderFluxo(key, 'devolucao');
+  if (geral)     geral.innerHTML     = renderInfoGeral(key);
+}
+
+function toggleCard(key) {
+  const body = document.getElementById('body-' + key);
+  const chev = document.getElementById('chev-' + key);
+  const isOpen = body.classList.contains('open');
+  document.querySelectorAll('.client-body').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('.chevron').forEach(c => c.classList.remove('open'));
+  if (!isOpen) {
+    populatePanels(key);
+    body.classList.add('open');
+    chev.classList.add('open');
+  }
+}
+
+function switchBodyTab(key, tab, el) {
+  document.querySelectorAll(`#card-${key} .body-tab`).forEach(t => t.classList.remove('active'));
+  document.querySelectorAll(`#card-${key} .body-panel`).forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(`panel-${key}-${tab}`).classList.add('active');
+}
+
+function switchSection(id, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('section-' + id).classList.add('active');
+}
+
+function filterPend(f, el) {
+  pendFilter = f;
+  document.querySelectorAll('.pend-filter button').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderPendencias();
+}
+
+function applyUrl() {
+  const val = document.getElementById('sheets-url').value.trim();
+  if (val) {
+    sheetBaseUrl = val.includes('?') ? val.split('?')[0] + '?output=csv&' : val + '?output=csv&';
+    loadAll();
+  }
+}
+
+/* ── DEMO DATA (quando não há URL configurada) ────────────────────── */
+function demoData() {
+  return {
+    pendencias: [
+      {id:'1',cliente:'TAIFF',area:'Tecnologia/Fiscal',pergunta:'Flagship TAIFF envia cancelamentos automaticamente ao AJD?',responsavel:'L. Dias',status:'Aberto',data_resposta:''},
+      {id:'2',cliente:'TAIFF',area:'Tecnologia/Fiscal',pergunta:'AJD cancela a NF de venda automaticamente (< 24h)?',responsavel:'L. Dias',status:'Aberto',data_resposta:''},
+      {id:'3',cliente:'TAIFF',area:'Operações',pergunta:'Aviso de cancelamento no Slack: quem envia e para qual canal?',responsavel:'Priscila Rinco',status:'Aberto',data_resposta:''},
+      {id:'4',cliente:'TAIFF',area:'Tecnologia/WMS',pergunta:'Cancelamento no AJD cria automaticamente Ordem de Recebimento no SILT?',responsavel:'David',status:'Aberto',data_resposta:''},
+      {id:'5',cliente:'TAIFF',area:'Financeiro/SAC',pergunta:'No modelo Fullservice (com PAY): quem processa o reembolso e como o cliente é avisado?',responsavel:'A confirmar',status:'Aberto',data_resposta:''},
+      {id:'6',cliente:'TAIFF',area:'Torre de Controle',pergunta:'Cancelamentos após expedição: ocorre? Como impedimos a entrega?',responsavel:'Renata (Torre)',status:'Aberto',data_resposta:''},
+      {id:'7',cliente:'NJR',area:'Torre de Controle',pergunta:'Cancelamentos após expedição: ocorre? Como impedimos a entrega?',responsavel:'Renata (Torre)',status:'Aberto',data_resposta:''},
+      {id:'8',cliente:'TNF',area:'Operações/Fraude',pergunta:'Existe análise de fraude para TNF? Quem é responsável?',responsavel:'Priscila Rinco / Hugo',status:'Aberto',data_resposta:''},
+      {id:'9',cliente:'TNF',area:'Torre de Controle',pergunta:'Cancelamentos após expedição para TNF: como impedimos?',responsavel:'Renata (Torre)',status:'Aberto',data_resposta:''},
+    ]
+  };
+}
+
+function demoFluxo(cliente, tipo) {
+  const data = {
+    TAIFF: {
+      cancelamento: [
+        {n:'1', desc:'Gatilho: marca avisa (marketplace) / automático via flagship / time de fraude', pend:true},
+        {n:'2', desc:'Cancelamento executado na AJD (automático, fraude ou CS)', pend:false},
+        {n:'3a', desc:'< 24h da NF → AJD cancela NF de venda', pend:true},
+        {n:'3b', desc:'> 24h da NF → AJD cria devolução + gera NFD', pend:false},
+        {n:'4', desc:'Aviso no Slack para time operacional', pend:true},
+        {n:'5', desc:'AJD cria automaticamente Ordem de Recebimento no SILT', pend:true},
+        {n:'6', desc:'Time operacional reintegra estoque no armazém de disponíveis e cancela pedido no SILT', pend:false},
+        {n:'7', desc:'Reembolso — processamento e comunicação ao cliente', pend:true},
+      ],
+      devolucao: [
+        {n:'1', desc:'Gatilho: marca avisa ou Torre de Controle identifica ocorrência', pend:false},
+        {n:'2', desc:'Cria devolução na AJD → gera NFD na AJD', pend:false},
+        {n:'3', desc:'AJD cria automaticamente Ordem de Recebimento no SILT', pend:true},
+        {n:'4', desc:'Pedido devolvido chega no CD', pend:false},
+        {n:'5', desc:'Reintegração no armazém de disponíveis (mesmo fluxo do cancelamento)', pend:false},
+      ],
+    },
+    NJR: {
+      cancelamento: [
+        {n:'1', desc:'Gatilho: automático via OMS (TikTok + flagship) ou time de fraude', pend:true},
+        {n:'2', desc:'Cancelamento no OMS (automático ou por fraude)', pend:false},
+        {n:'3a', desc:'< 24h da NF → OMS aciona Protheus → cancela NF automaticamente', pend:false},
+        {n:'3b', desc:'> 24h da NF → OMS aciona Protheus → emite NFD (anexada no Seller Portal)', pend:false},
+        {n:'4', desc:'OMS → WMS Inventa: cancelamento automático do pedido no WMS', pend:false},
+        {n:'5a', desc:'Antes do picking: WMS cancela picking → operador reintegra estoque nos disponíveis', pend:false},
+        {n:'5b', desc:'Após picking finalizado: WMS gera tarefa de reabastecimento no armazém de disponíveis', pend:false},
+      ],
+      devolucao: [
+        {n:'1', desc:'Cliente via link / marca no Seller Portal / Torre de Controle cria solicitação no SP', pend:false},
+        {n:'2', desc:'SAC aprova solicitação no Seller Portal', pend:false},
+        {n:'3', desc:'OMS → WMS Inventa: criação automática de Ordem de Recebimento', pend:false},
+        {n:'4', desc:'Pedido devolvido chega no CD', pend:false},
+        {n:'5a', desc:'Conferência de qualidade: tudo OK → NFD 100% da NF de origem', pend:false},
+        {n:'5b', desc:'Conferência de qualidade: avaria → NFD 100% da NF de origem', pend:false},
+        {n:'5c', desc:'Conferência de qualidade: falta → NFD somente dos SKUs e quantidades recebidos (OK + avariados)', pend:false},
+        {n:'6', desc:'Resultado da conferência enviado via integração ao OMS → Protheus emite NFD automaticamente', pend:false},
+        {n:'7', desc:'Time operacional reintegra estoque nos disponíveis após emissão da NFD', pend:false},
+      ],
+    },
+    TNF: {
+      cancelamento: [
+        {n:'1', desc:'Gatilho: aviso manual recebido ou time de fraude', pend:true},
+        {n:'2', desc:'Cancelamento no OMS via time de CS ou time de fraude', pend:false},
+        {n:'3a', desc:'< 24h da NF → cancela apenas no OMS (cliente responsável pela NF no ERP dele)', pend:false},
+        {n:'3b', desc:'> 24h da NF → cancela no OMS + CS + Fiscal solicitam ao cliente emissão da NFD e garantem upload no SP', pend:false},
+        {n:'4', desc:'OMS → WMS Inventa: cancelamento automático do pedido', pend:false},
+        {n:'5a', desc:'Antes do picking: WMS cancela picking → operador reintegra estoque nos disponíveis', pend:false},
+        {n:'5b', desc:'Após picking finalizado: WMS gera tarefa de reabastecimento no armazém de disponíveis', pend:false},
+      ],
+      devolucao: [
+        {n:'1', desc:'Cliente via link / marca no Seller Portal / Torre de Controle cria solicitação no SP', pend:false},
+        {n:'2', desc:'SAC aprova solicitação no Seller Portal', pend:false},
+        {n:'3', desc:'OMS → WMS Inventa: criação automática de Ordem de Recebimento', pend:false},
+        {n:'4', desc:'Pedido devolvido chega no CD', pend:false},
+        {n:'5a', desc:'Conferência de qualidade: tudo OK → NFD 100% da NF de origem', pend:false},
+        {n:'5b', desc:'Conferência de qualidade: avaria → NFD 100% da NF de origem', pend:false},
+        {n:'5c', desc:'Conferência de qualidade: falta → NFD somente dos SKUs e quantidades recebidos (OK + avariados)', pend:false},
+        {n:'6', desc:'Resultado da conferência apresentado na tela da devolução no Seller Portal (via integração OMS)', pend:false},
+        {n:'7', desc:'CS + Fiscal solicitam ao cliente emissão da NFD conforme resultado + garantem upload no SP', pend:false},
+        {n:'8', desc:'Time operacional reintegra estoque nos disponíveis após emissão da NFD', pend:false},
+      ],
+    },
+  };
+  const steps = (data[cliente]||{})[tipo] || [];
+  if (!steps.length) return '<div style="color:#aaa;font-size:13px;padding:8px 0">Sem dados mapeados.</div>';
+  let html = '<div class="flow-steps">';
+  steps.forEach(s => {
+    html += `<div class="flow-step">
+      <div class="step-num ${s.n.includes('.')||/[a-z]/.test(s.n)?'sub':''}">${s.n}</div>
+      <div class="step-content">
+        <div class="step-desc">${injectOwners(s.desc)}</div>
+        ${s.pend ? '<div class="step-pending">⚠ Ponto pendente — aguardando confirmação</div>' : ''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function demoInfoGeral(cliente) {
+  const d = {
+    TAIFF: [['Stack','Antiga (AJD + SILT)'],['Order Management','AJD'],['WMS','SILT'],['ERP / Fiscal','AJD (próprio)'],['Modelo Fiscal','Compra e Venda — emitimos a NF como nossos'],['Modelo de Serviço','Fullservice (LOG + SAC + PAY + Transporte)'],['Canais de Venda','Flagship + Marketplaces']],
+    NJR:   [['Stack','Nova (OMS Inventa + WMS Inventa)'],['Order Management','OMS Inventa'],['WMS','WMS Inventa'],['ERP / Fiscal','Protheus (filial com certificado digital)'],['Modelo Fiscal','Filial c/ cert. digital — emitimos NF via Protheus'],['Modelo de Serviço','Fullfilment Puro (LOG + Transporte)'],['Canais de Venda','Flagship + TikTok Shop']],
+    TNF:   [['Stack','Nova (OMS Inventa + WMS Inventa)'],['Order Management','OMS Inventa'],['WMS','WMS Inventa'],['ERP / Fiscal','ERP do próprio cliente (sem certificado digital)'],['Modelo Fiscal','Filial s/ cert. — cliente emite NF no ERP dele'],['Modelo de Serviço','Fullfilment Puro (LOG + Transporte)'],['Canais de Venda','Flagship + Marketplaces']],
+  };
+  const rows = d[cliente]||[];
+  let html = '<table class="overview-table"><thead><tr><th>Configuração</th><th>Valor</th></tr></thead><tbody>';
+  rows.forEach(([k,v]) => { html += `<tr><td class="subdim">${k}</td><td>${v}</td></tr>`; });
+  html += '</tbody></table>';
+  return html;
+}
+
+function demoVisao() {
+  const dims = [
+    ['INFRA','Stack','Antiga (AJD + SILT)','Nova (OMS + WMS Inventa)','Nova (OMS + WMS Inventa)'],
+    ['INFRA','Modelo Fiscal','Compra e Venda (emitimos NF)','Filial c/ cert. digital (Protheus)','Filial s/ cert. (cliente emite NF)'],
+    ['INFRA','Modelo de Serviço','Fullservice (LOG+SAC+PAY+TRANSP)','Fullfilment Puro','Fullfilment Puro'],
+    ['CANCELAMENTO','Regra fiscal < 24h','AJD cancela NF ⚠ confirmar L. Dias','OMS aciona Protheus → cancela NF automático','Cancela só no OMS (cliente cancela NF no ERP dele)'],
+    ['CANCELAMENTO','Regra fiscal > 24h','Cria devolução na AJD → emite NFD','OMS aciona Protheus → emite NFD automático (Seller Portal)','CS + Fiscal solicitam NFD ao cliente e garantem upload no SP'],
+    ['CANCELAMENTO','Integração WMS','Cria Ordem de Recebimento no SILT ⚠ confirmar David','OMS → WMS Inventa: cancelamento automático','OMS → WMS Inventa: cancelamento automático'],
+    ['CANCELAMENTO','Pós WMS (antes picking)','Operador reintegra + cancela no SILT','WMS cancela picking → operador reintegra','WMS cancela picking → operador reintegra'],
+    ['CANCELAMENTO','Pós WMS (após picking)','Operador reintegra + cancela no SILT','WMS gera tarefa de reabastecimento','WMS gera tarefa de reabastecimento'],
+    ['DEVOLUÇÃO','Aprovação','Manual / não mapeado (stack antiga)','SAC aprova no Seller Portal','SAC aprova no Seller Portal'],
+    ['DEVOLUÇÃO','Emissão da NFD','Gerada na AJD','OMS → Protheus emite automaticamente conforme resultado da conferência','CS + Fiscal solicitam ao cliente + garantem upload no SP'],
+    ['DEVOLUÇÃO','Reintegração de estoque','Time operacional (pós conferência)','Time operacional após emissão da NFD','Time operacional após emissão da NFD'],
+    ['EXTRAVIO','Fluxo','Regra geral aplicável','Regra geral aplicável','Regra geral aplicável'],
+  ];
+
+  let lastDim = '';
+  let html = '<div class="compare-wrap"><table class="compare-table"><thead><tr>';
+  html += '<th style="width:200px">Dimensão / Sub-dimensão</th>';
+  html += '<th class="taiff">TAIFF</th><th class="njr">NJR</th><th class="tnf">TNF</th></tr></thead><tbody>';
+
+  dims.forEach(([dim, sub, t, n, f]) => {
+    if (dim !== lastDim) {
+      html += `<tr class="dim-row"><td colspan="4">${dim}</td></tr>`;
+      lastDim = dim;
+    }
+    const pT = t.includes('⚠'), pN = n.includes('⚠'), pF = f.includes('⚠');
+    html += `<tr>
+      <td><span class="subdim">${sub}</span></td>
+      <td class="taiff-cell ${pT?'cell-pending':''}">${fmt(t)}</td>
+      <td class="njr-cell ${pN?'cell-pending':''}">${fmt(n)}</td>
+      <td class="tnf-cell ${pF?'cell-pending':''}">${fmt(f)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+/* ── INIT ─────────────────────────────────────────────────────────── */
+renderTeam();
+renderVisao();
+renderClients();
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);</script>
+</body>
+</html>
